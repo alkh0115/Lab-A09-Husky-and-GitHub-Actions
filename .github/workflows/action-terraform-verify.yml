@@ -1,4 +1,4 @@
-name: Validate terraform fmt
+name: Validate terraform fmt and validate
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  terraform_fmt:
     runs-on: ubuntu-latest
     name: terraform fmt check
     outputs:
@@ -36,14 +36,11 @@ jobs:
         run: |
           set +e
           echo "CHECK_STATUS=0" >> $GITHUB_ENV
-
           for changed_file in ${{ steps.pr_files.outputs.added_modified }}; do
             echo "Checking terraform fmt on ${changed_file}..."
-
             if [[ $changed_file == *.tf ]]; then
               terraform fmt -check $changed_file
-              FMT_STATUS=$(echo $?)
-
+              FMT_STATUS=$?
               if [[ $FMT_STATUS -ne 0 ]]; then
                 echo "❌ terraform fmt failed - ${changed_file}" >> $GITHUB_STEP_SUMMARY
                 echo "CHECK_STATUS=1" >> $GITHUB_ENV
@@ -54,3 +51,22 @@ jobs:
       - name: Process check
         if: always()
         run: exit $CHECK_STATUS
+
+  terraform_validate:
+    runs-on: ubuntu-latest
+    name: terraform validate check
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.2.4
+
+      - name: Initialize Terraform
+        run: terraform init
+        working-directory: ./infrastructure
+
+      - name: Validate Terraform configuration
+        run: terraform validate
+        working-directory: ./infrastructure
